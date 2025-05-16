@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Define variables you might want to change
 PROJECT_NAME="Distributed Network Packet Monitor"
 GITHUB_USERNAME="your-username"
