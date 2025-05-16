@@ -285,7 +285,9 @@ void print_statistics() {
     cout << "\nTop Protocols:" << endl;
     vector<pair<string, uint64_t>> protocol_vec(protocol_count.begin(), protocol_count.end());
     sort(protocol_vec.begin(), protocol_vec.end(), 
-         [](const auto& a, const auto& b) { return a.second > b.second; });
+         [](const pair<string, uint64_t>& a, const pair<string, uint64_t>& b) { 
+             return a.second > b.second; 
+         });
     
     for (size_t i = 0; i < min(size_t(5), protocol_vec.size()); ++i) {
         cout << "  " << setw(10) << left << protocol_vec[i].first << ": " 
@@ -301,7 +303,9 @@ void print_statistics() {
     cout << "\nTop Source IPs:" << endl;
     vector<pair<string, uint64_t>> ip_vec(ip_packet_count.begin(), ip_packet_count.end());
     sort(ip_vec.begin(), ip_vec.end(), 
-         [](const auto& a, const auto& b) { return a.second > b.second; });
+         [](const pair<string, uint64_t>& a, const pair<string, uint64_t>& b) { 
+             return a.second > b.second; 
+         });
     
     for (size_t i = 0; i < min(size_t(5), ip_vec.size()); ++i) {
         cout << "  " << setw(18) << left << ip_vec[i].first << ": " 
@@ -313,7 +317,9 @@ void print_statistics() {
     cout << "\nTop Ports:" << endl;
     vector<pair<int, uint64_t>> port_vec(port_count.begin(), port_count.end());
     sort(port_vec.begin(), port_vec.end(), 
-         [](const auto& a, const auto& b) { return a.second > b.second; });
+         [](const pair<int, uint64_t>& a, const pair<int, uint64_t>& b) { 
+             return a.second > b.second; 
+         });
     
     for (size_t i = 0; i < min(size_t(5), port_vec.size()); ++i) {
         string port_service = to_string(port_vec[i].first);
