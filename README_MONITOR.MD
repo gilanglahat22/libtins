@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define variables you might want to change
-PROJECT_NAME="Network Packet Monitor"
+PROJECT_NAME="Distributed Network Packet Monitor"
 GITHUB_USERNAME="your-username"
 CURRENT_YEAR=$(date +"%Y")
 
@@ -9,149 +9,222 @@ CURRENT_YEAR=$(date +"%Y")
 cat > README.md << EOF
 # ${PROJECT_NAME}
 
-A network packet monitoring tool built using libtins library that captures and displays network packets, showing source IP, destination IP, protocol, source port, and destination port information.
+A distributed network monitoring system consisting of two components:
+1. **Packet Agent** - Runs on target computers to capture network packets
+2. **Packet Monitor Server** - Collects and displays packet data from multiple agents
+
+This system allows you to monitor network traffic from multiple computers without special network hardware or configuration.
 
 ## Overview
 
-This tool monitors network traffic on a specified interface and displays the key packet information in a tabular format. It utilizes the libtins C++ library for packet sniffing and analysis.
+The Distributed Network Packet Monitor provides a client-server architecture for network traffic monitoring:
+
+- **Packet Agents** run on the computers you want to monitor
+- **Packet Monitor Server** runs on a central monitoring computer
+- Packet metadata is transmitted over a TCP connection
+- The system only transmits packet headers/metadata (not packet payload)
 
 ## Features
 
-- Captures network packets in real-time
-- Displays source IP, destination IP, protocol, source port, and destination port
-- Identifies common protocols (HTTP, HTTPS, DNS, etc.)
-- Supports packet filtering using BPF syntax
-- Shows packets from all devices on the network segment (promiscuous mode)
-- Lists available network interfaces
+- Monitor multiple computers from a central location
+- Real-time packet capture and display
+- Statistics on protocols, IP addresses, and ports
+- Colorized output for different protocols
+- Automatic reconnection if connection is lost
+- Optional logging to file
+- Works across different networks (LAN/WAN)
 
 ## Prerequisites
 
+### For Both Monitor and Agent Computers
+
 - Linux-based operating system (Ubuntu, Debian, etc.)
 - C++ compiler (g++)
+- Network connectivity between computers
+
+### For Agent Computers (Additional)
+
 - libtins library
 - libpcap development files
 - Root/sudo privileges (required for packet capture)
 
 ## Installation
 
-### 1. Install required dependencies
+### 1. Install Dependencies
 
+#### On Monitor Computer
 \`\`\`bash
 sudo apt update
-sudo apt install build-essential libpcap-dev
+sudo apt install g++ build-essential
 \`\`\`
 
-### 2. Install libtins
-
-There are two ways to install libtins:
-
-#### Option A: Install via package manager (recommended for beginners)
-
+#### On Agent Computers
 \`\`\`bash
+sudo apt update
+sudo apt install g++ build-essential libpcap-dev
 sudo apt install libtins-dev
 \`\`\`
 
-#### Option B: Build from source (for latest version)
-
+If libtins is not available in your repositories, you can build from source:
 \`\`\`bash
 git clone https://github.com/mfontanini/libtins.git
 cd libtins
-mkdir build
-cd build
+mkdir build && cd build
 cmake ../
 make
 sudo make install
 sudo ldconfig
 \`\`\`
 
-### 3. Compile the packet monitor
+### 2. Setup Files
 
+#### On Monitor Computer
+1. Save the \`packet_monitor_server.cpp\` file
+2. Compile with:
 \`\`\`bash
-g++ packet_monitor.cpp -o packet_monitor -std=c++11 -ltins -lpthread
+g++ packet_monitor_server.cpp -o packet_monitor_server -std=c++11 -lpthread
 \`\`\`
+
+#### On Agent Computers
+1. Save the \`packet_agent.cpp\` file
+2. Compile with:
+\`\`\`bash
+g++ packet_agent.cpp -o packet_agent -std=c++11 -ltins -lpthread
+\`\`\`
+
+## Network Configuration
+
+### Determine IP Addresses
+
+1. On the Monitor Computer, find your IP address:
+\`\`\`bash
+ip addr show
+\`\`\`
+or
+\`\`\`bash
+ifconfig
+\`\`\`
+
+2. Note your IP address (like 192.168.1.100)
+
+### Configure Firewall (if necessary)
+
+On the Monitor Computer:
+\`\`\`bash
+# For UFW (Ubuntu)
+sudo ufw allow 5500/tcp
+
+# For iptables
+sudo iptables -A INPUT -p tcp --dport 5500 -j ACCEPT
+\`\`\`
+
+### For Connections Across Different Networks
+
+If your Monitor and Agent computers are on different networks:
+
+1. You'll need to set up port forwarding on your router to direct traffic on port 5500 to your Monitor computer
+2. Use your public IP address for the connection
+3. Make sure port 5500 is open in any cloud provider firewall if using VMs
 
 ## Usage
 
-### Basic usage
+### Start the Monitor Server
 
+On the Monitor Computer:
 \`\`\`bash
-sudo ./packet_monitor <interface>
+./packet_monitor_server
 \`\`\`
 
-Replace \`<interface>\` with your network interface name (e.g., eth0, wlan0).
-
-### List available interfaces
-
+Options:
 \`\`\`bash
-sudo ./packet_monitor -l
+./packet_monitor_server [options]
+  -p, --port PORT       Listen on port (default: 5500)
+  -o, --output FILE     Save packet data to file
+  -n, --no-color        Disable colored output
+  -s, --no-stats        Disable statistics
+  -i, --interval SEC    Statistics display interval (default: 10)
 \`\`\`
 
-### Apply filters
+### Start the Packet Agent(s)
 
+On each Agent Computer:
 \`\`\`bash
-sudo ./packet_monitor <interface> "filter expression"
+sudo ./packet_agent eth0 192.168.1.100
 \`\`\`
+Replace:
+- \`eth0\` with the network interface you want to monitor
+- \`192.168.1.100\` with the IP address of your Monitor computer
 
-Example filters:
-- HTTP and HTTPS traffic: \`"tcp port 80 or tcp port 443"\`
-- Traffic to/from specific host: \`"host 192.168.1.100"\`
-- Only UDP traffic: \`"udp"\`
+Options:
+\`\`\`bash
+sudo ./packet_agent <interface> <monitor_ip> [options]
+  -p, --port PORT       Specify monitor port (default: 5500)
+  -f, --filter FILTER   Set packet filter (BPF syntax)
+  -l, --list            List available interfaces and exit
+\`\`\`
 
 ## Output Format
 
+The Monitor Server displays packet information in the following format:
+
 \`\`\`
-SOURCE IP            SRC_PORT               DESTINATION IP DST_PORT PROTOCOL  
-----------------------------------------------------------------------
-192.168.1.100        52134                 142.250.180.78    443   HTTPS    
-192.168.1.1          53                     192.168.1.100    60456  DNS     
-192.168.1.100        48772                  192.168.1.1      53     DNS     
+TIMESTAMP             SOURCE               DESTINATION          PROTOCOL   SIZE       AGENT
+--------------------------------------------------------------------------------------------
+2025-05-16 15:42:01   192.168.1.101:52134  142.250.180.78:443   HTTPS      1.4 KB     laptop1
+2025-05-16 15:42:02   192.168.1.102:48772  192.168.1.1:53       DNS        134 B      desktop2
+2025-05-16 15:42:03   192.168.1.103:58788  35.224.170.84:443    HTTPS      2.7 KB     server1
 \`\`\`
 
-## Understanding the Output
+## Packet Filtering
 
-- **SOURCE IP**: The IP address of the packet sender
-- **SRC_PORT**: The source port number (only for TCP/UDP)
-- **DESTINATION IP**: The IP address of the packet recipient
-- **DST_PORT**: The destination port number (only for TCP/UDP)
-- **PROTOCOL**: The identified protocol (TCP, UDP, HTTP, HTTPS, DNS, etc.)
+You can apply filters to the Packet Agent using Berkeley Packet Filter (BPF) syntax:
+
+\`\`\`bash
+sudo ./packet_agent eth0 192.168.1.100 -f "tcp port 80 or tcp port 443"
+\`\`\`
+
+Common filter examples:
+- HTTP/HTTPS traffic: \`"tcp port 80 or tcp port 443"\`
+- DNS traffic: \`"udp port 53"\`
+- Traffic to/from a specific host: \`"host 192.168.1.5"\`
+- Only TCP traffic: \`"tcp"\`
+- Exclude certain traffic: \`"not port 22"\`
 
 ## Troubleshooting
 
-### "Error opening interface"
-- Make sure you're running with sudo/root privileges
-- Verify that the interface name is correct (use \`-l\` to list interfaces)
-- Check if the interface is up and running
+### Connection Issues
 
-### No packets appearing
-- Generate some traffic (e.g., open a web browser)
-- Try a different interface
-- Check if your network setup allows promiscuous mode
+If the Agent cannot connect to the Monitor:
 
-### Compilation errors
-- Make sure libtins is properly installed
-- Check that you have the required development libraries installed
+1. Verify the Monitor is running
+2. Check that the IP address is correct
+3. Ensure port 5500 is open in firewalls
+4. Test basic connectivity: \`ping <monitor-ip>\`
+5. Test TCP connectivity: \`nc -v <monitor-ip> 5500\`
 
-## Network Capture Notes
+### No Packets Displayed
 
-- On switched networks, you'll typically only see:
-  - Traffic to/from your machine
-  - Broadcast traffic
-  - Multicast traffic
+If no packets are being displayed:
 
-- To capture all traffic between all devices, you need:
-  - A hub-based network (rare nowadays)
-  - A network tap
-  - A switch configured for port mirroring/SPAN
-  - A WiFi adapter in monitor mode (for wireless networks)
+1. Make sure the Agent is running with sudo/root privileges
+2. Verify the interface name is correct (use \`-l\` to list interfaces)
+3. Check if there is any active network traffic on the target computer
+4. Try using a different interface if multiple are available
 
-## Advanced Usage
+### Agent Keeps Disconnecting
 
-### Common BPF Filter Examples
+If the Agent disconnects frequently:
 
-- Only ICMP (ping) traffic: \`"icmp"\`
-- Only SSH traffic: \`"tcp port 22"\`
-- Ignore specific IP: \`"not host 192.168.1.1"\`
-- Multiple criteria: \`"tcp port 80 and host 192.168.1.100"\`
+1. Check network stability between the computers
+2. Firewall might be timing out the connection
+3. The Monitor computer might be under heavy load
+
+## Security Considerations
+
+- The system only transmits packet metadata, not packet contents
+- Both components use regular TCP connections without encryption
+- For sensitive environments, consider running over SSH tunnels
+- Only install the Agent on computers you have permission to monitor
 
 ## License
 
@@ -181,5 +254,3 @@ SOFTWARE.
 
 This tool is built using the [libtins library](https://github.com/mfontanini/libtins), a high-level, multiplatform C++ network packet crafting and sniffing library.
 EOF
-
-echo "README.md has been generated!"
