@@ -251,4 +251,3 @@ SOFTWARE.
 ## Acknowledgements
 
 This tool is built using the [libtins library](https://github.com/mfontanini/libtins), a high-level, multiplatform C++ network packet crafting and sniffing library.
-EOF
